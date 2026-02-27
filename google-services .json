@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "262955046933",
+    "project_id": "flash-flood-early-warning-sys",
+    "storage_bucket": "flash-flood-early-warning-sys.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:262955046933:android:5b77a18bef171a05a2161c",
+        "android_client_info": {
+          "package_name": "com.sruthi.floodalert"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzSdCwuP0-pG98w70A6N7VIuCFDG8ikDw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
