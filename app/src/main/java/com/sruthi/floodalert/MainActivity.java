@@ -1,30 +1,37 @@
 package com.sruthi.floodalert;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.location.Location;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnSuccessListener;
+
 import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
     // UI elements
-    TextView txtLoading, tempText, humidityText, windSpeedText, windDirText, rainText;
+    TextView txtLoading, txtCityName, tempText, humidityText, windSpeedText, windDirText, rainText;
     LinearLayout weatherLayout;
-    EditText edtCity;
-    Button btnSearch;
-
-    String currentCity = "Chennai"; // default city
+    
+    // Location client
+    private FusedLocationProviderClient fusedLocationClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize views
         txtLoading = findViewById(R.id.txtLoading);
+        txtCityName = findViewById(R.id.txtCityName);
         weatherLayout = findViewById(R.id.dataLayout);
 
         tempText = findViewById(R.id.txtTemp);
@@ -41,36 +49,40 @@ public class MainActivity extends AppCompatActivity {
         windDirText = findViewById(R.id.txtWindDir);
         rainText = findViewById(R.id.txtRain);
 
-        edtCity = findViewById(R.id.edtCity);
-        btnSearch = findViewById(R.id.btnSearch);
-
         // Show loading initially
         txtLoading.setVisibility(View.VISIBLE);
         weatherLayout.setVisibility(View.GONE);
 
-        // Load default city weather
-        fetchWeatherData(currentCity);
-
-        // Search button click
-        btnSearch.setOnClickListener(v -> {
-            String cityInput = edtCity.getText().toString().trim();
-
-            if (!cityInput.isEmpty()) {
-                currentCity = cityInput;
-                txtLoading.setVisibility(View.VISIBLE);
-                weatherLayout.setVisibility(View.GONE);
-                fetchWeatherData(currentCity);
-            } else {
-                edtCity.setError("Enter city name");
-            }
-        });
+        // Initialize Location Client
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        getLastLocation();
     }
 
-    private void fetchWeatherData(String city) {
+    private void getLastLocation() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // Permissions should have been granted in LoginActivity, but double checking here.
+            Toast.makeText(this, "Location permission missing", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
+                    @Override
+                    public void onSuccess(Location location) {
+                        if (location != null) {
+                            fetchWeatherData(location.getLatitude(), location.getLongitude());
+                        } else {
+                            txtLoading.setText("Unable to find location. Ensure location is enabled.");
+                        }
+                    }
+                });
+    }
+
+    private void fetchWeatherData(double lat, double lon) {
 
         String apiKey = "b71f1e082c91418b2f1cec26bf46a3b1";
-        String url = "https://api.openweathermap.org/data/2.5/weather?q="
-                + city + "&appid=" + apiKey;
+        // Update URL to use lat and lon instead of city name
+        String url = "https://api.openweathermap.org/data/2.5/weather?lat=" + lat + "&lon=" + lon + "&appid=" + apiKey;
 
         RequestQueue queue = Volley.newRequestQueue(this);
 
@@ -80,6 +92,8 @@ public class MainActivity extends AppCompatActivity {
                 null,
                 response -> {
                     try {
+                        String cityName = response.getString("name");
+                        
                         JSONObject main = response.getJSONObject("main");
                         double tempC = main.getDouble("temp") - 273.15;
                         int humidity = main.getInt("humidity");
@@ -96,11 +110,14 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
 
+                        // Update Location text
+                        txtCityName.setText(cityName != null && !cityName.isEmpty() ? cityName : "Current Location");
+
                         // Update UI
-                        tempText.setText(String.format("Temperature: %.1f °C", tempC));
-                        humidityText.setText("Humidity: " + humidity + " %");
-                        windSpeedText.setText("Wind Speed: " + windSpeed + " m/s");
-                        windDirText.setText("Wind Direction: " + windDeg + "°");
+                        tempText.setText(String.format("%.1f °C", tempC));
+                        humidityText.setText("Humidity: " + humidity + "%");
+                        windSpeedText.setText("Wind: " + windSpeed + " m/s");
+                        windDirText.setText("Direction: " + windDeg + "°");
                         rainText.setText("Rain: " + rainValue);
 
                         // Show data
@@ -108,10 +125,10 @@ public class MainActivity extends AppCompatActivity {
                         weatherLayout.setVisibility(View.VISIBLE);
 
                     } catch (Exception e) {
-                        txtLoading.setText("Error loading data");
+                        txtLoading.setText("Error loading data parsing");
                     }
                 },
-                error -> txtLoading.setText("City not found / Network error")
+                error -> txtLoading.setText("Network error fetching weather")
         );
 
         queue.add(request);
